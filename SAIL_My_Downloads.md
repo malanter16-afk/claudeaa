@@ -4,7 +4,7 @@ Your checklist for the SAIL Lodhi Road visualisation (Blender 5.2 + Cycles, Unre
 Links were researched on 23 Oct 2026 and every one was opened from a script. Sites that block scripts (Vitra, Fab, Poliigon, BIMobject, mtextur, Syncronia, Evermotion, Acuity) still open normally in a browser.
 
 - **Sections 1–11:** only **you** can get these. Each needs your account, a login, a purchase or a manual click, or the site's terms ban bots.
-- **Section 12:** what **Claude downloads automatically**. Skip those.
+- **Section 12:** what **the project downloads automatically**. Skip those.
 
 **Tags:** `account` = free sign-up · `paid` = purchase · `manual` = free, no login, but click-only · `check` = portal confirmed, exact file/licence not confirmed
 
@@ -13,12 +13,12 @@ Links were researched on 23 Oct 2026 and every one was opened from a script. Sit
 ## 0. Before you start
 
 **Where files go:** drop every download, still zipped, into `assets/inbox/<source>/<item>/`
-(e.g. `assets/inbox/knoll/barcelona-chair/`). Claude handles conversion, real-world scale, origin, materials, bevels and the licence manifest.
+(e.g. `assets/inbox/knoll/barcelona-stool/`). The project's ingest tool ([tools/asset_ingest](tools/asset_ingest/README.md)) unpacks, converts (including SketchUp and Collada), fixes scale and origin, embeds textures, writes the licence manifest and imports into Unreal. No manual conversion.
 
-**Format to pick:** FBX → OBJ → glTF → 3DS → SKP → DWG-3D. **Skip Revit `.rfa`** (Blender can't open it). Lighting: `.ies` best, `.ldt` fine (Claude converts).
+**Format to pick:** FBX → OBJ → glTF → SKP → Collada. On manufacturer pages with a format menu (e.g. Knoll: Revit / 2D AutoCAD / 3D AutoCAD / SketchUp) take **SketchUp** (or *All Files*). The tool can't use Revit, DWG or 3ds Max files. Lighting: download **`.ies`** (Unreal needs IES; LDT is not converted).
 
 **Licence rule:** the renders go to SAIL in a pitch, so treat it as commercial use. Nothing here is pirated, non-commercial or research-only.
-Use manufacturer models in scenes and renders, but never pass the model files themselves on to anyone. Credit CC-BY authors in `ATTRIBUTIONS.md` (Claude writes it).
+Use manufacturer models in scenes and renders, but never pass the model files themselves on to anyone. Credit CC-BY authors in `ATTRIBUTIONS.md` (the ingest tool's manifest feeds it).
 
 **Accounts to create (one sitting):**
 - [ ] Trimble ID (3D Warehouse)
@@ -98,7 +98,7 @@ The story here: SAIL is a steel company, so the furniture is steel too. Chrome a
 
 | ✓ | What | Link | Zone | Licence / notes |
 |---|---|---|---|---|
-| [ ] | **Heavy Section Rolling Mill** (Skebobruks museum scan) | [Sketchfab](https://sketchfab.com/3d-models/heavy-section-rolling-mill-80e01ff6ebc24bc9a4f784eddcfab047) | Z3 historic machine | CC-BY, about 1.4M tris (Claude decimates) |
+| [ ] | **Heavy Section Rolling Mill** (Skebobruks museum scan) | [Sketchfab](https://sketchfab.com/3d-models/heavy-section-rolling-mill-80e01ff6ebc24bc9a4f784eddcfab047) | Z3 historic machine | CC-BY, about 1.4M tris (decimate before use) |
 | [ ] | **Steelworks, factory, blast furnace** (Metazeon drone scan) | [Sketchfab](https://sketchfab.com/3d-models/steelworks-factory-blast-furnace-c2c1673b1e054becb0e0253001fc59ed) | Z4 plant miniature, Z2 content | CC-BY, about 946k tris |
 | [ ] | Gearbox, two-stage helical | [Sketchfab](https://sketchfab.com/3d-models/gearbox-a8a313efec1c48988f946b99b64638ad) | Z3 / Z6 | CC-BY |
 | [ ] | Gearbox (conical), T-FLEX | [Sketchfab](https://sketchfab.com/3d-models/gearbox-conical-60f023924ee0456daa758eb590b6064b) | Z6 | CC-BY |
@@ -106,7 +106,7 @@ The story here: SAIL is a steel company, so the furniture is steel too. Chrome a
 | [ ] | steeluniversity **Steelmaking** collection | [Sketchfab collection](https://sketchfab.com/steeluniversity/collections/steelmaking-en-3719a8ad0cba428b8ff606591fcbe3bf) | Z4 miniatures, Z6 | `check`: may be view-only; at least a modelling reference |
 | [ ] | Sketchfab **Museums** collection (388 scans) | [Sketchfab](https://sketchfab.com/Sketchfab/collections/museums-a2dbe67aaa85476e96a9b4788d185cb0) | Z3, Z7 | Browse for CC-BY industrial heritage |
 
-> 💡 **Shortcut:** give Claude a Sketchfab API token (Sketchfab › Settings › Password & API). Claude can then pull all the CC-BY picks through Sketchfab's official download API and log the credits. That's allowed; scraping isn't.
+> 💡 **Shortcut:** put a Sketchfab API token in the project's config (Sketchfab › Settings › Password & API). The project can then pull all the CC-BY picks through Sketchfab's official download API and log the credits. That's allowed; scraping isn't.
 
 ---
 
@@ -150,7 +150,7 @@ The story here: SAIL is a steel company, so the furniture is steel too. Chrome a
 | [ ] | **LG** commercial display BIM library (incl. transparent OLED, LED) | [lg.com BIM library](https://www.lg.com/us/business/commercial-display/bim-library) | **Revit only.** Grab it only if someone can export FBX from Revit |
 | [ ] | 3D Warehouse brand search: Samsung, LG, Sony, Shure, Chief, Peerless-AV | [3D Warehouse](https://3dwarehouse.sketchup.com/) | `check` per model |
 
-Sony's Spatial Reality Display, the touch table, the LED walls and the transparent LED strips have no official 3D files, so **Claude models them** from published dimensions.
+Sony's Spatial Reality Display, the touch table, the LED walls and the transparent LED strips have no official 3D files, so **the project models them** from published dimensions.
 
 ---
 
@@ -183,14 +183,14 @@ Sony's Spatial Reality Display, the touch table, the LED walls and the transpare
 |---|---|---|---|
 | [ ] | **BIS IS 808** (beam/channel/angle sections), **IS 1786** (TMT), **IS 2062** | [BIS: how to download](https://www.bis.gov.in/wp-content/uploads/2021/09/STEPS-TO-DOWNLOAD-INDIAN-STANDARDS.pdf) | Free after registering; exact section sizes for Z5/Z6 samples. Keep the PDFs internal |
 | [ ] | **ArcelorMittal** sections (DWG) | [constructalia › CAD](https://constructalia.arcelormittal.com/en/tools/cad) | Cross-check section profiles |
-| [ ] | **Survey of India** state/district maps | [onlinemaps.surveyofindia.gov.in](https://onlinemaps.surveyofindia.gov.in/ProductSearch.aspx) | Only if Z4 needs state detail (Claude has the national map) |
+| [ ] | **Survey of India** state/district maps | [onlinemaps.surveyofindia.gov.in](https://onlinemaps.surveyofindia.gov.in/ProductSearch.aspx) | Only if Z4 needs state detail (the national map is fetched automatically) |
 | [ ] | **SAIL logo + brand guide** | from SAIL's corporate comms | Use the official vector, never a web rip |
 
 ---
 
 ## 11. Skip these
 
-- **"Stainless Steel Coil" (IM-SEGEV, Sketchfab):** non-commercial and no-derivatives. Claude builds coils instead.
+- **"Stainless Steel Coil" (IM-SEGEV, Sketchfab):** non-commercial and no-derivatives. Build coils procedurally instead.
 - **MBD_VR blast furnace:** CC-BY-NC-SA. **MRowa "Steel Works":** CC-BY-SA, a share-alike risk.
 - **TurboSquid / RenderHub "Editorial use only"** models, **free3d mirrors** of Evermotion or 3dsky packs.
 - **Chaos Cosmos:** only works inside Chaos renderers, not Blender.
@@ -198,9 +198,9 @@ Sony's Spatial Reality Display, the touch table, the LED walls and the transpare
 
 ---
 
-## 12. Not yours: Claude downloads these automatically
+## 12. Not yours: the project downloads these automatically
 
-Claude checked both APIs from this session on 23 Oct 2026, and both respond. No account is needed.
+Both APIs were checked on 23 Oct 2026 and respond. No account is needed.
 
 **Poly Haven (CC0)**: 521 models, 869 textures, 301 indoor HDRIs
 - Seating: `metal_stool_01/02/03`, `modern_arm_chair_01`, `mid_century_lounge_chair`, `sofa_02/03`, `Ottoman_01`, `bar_chair_round_01`, `modular_street_seating`
@@ -225,7 +225,7 @@ Claude checked both APIs from this session on 23 Oct 2026, and both respond. No 
 - **Smithsonian 3D** (CC0): a free api.data.gov key
 - **Sketchfab CC-BY picks**: your API token (see the shortcut in section 4)
 
-**Built procedurally by Claude**
+**Built procedurally in the project**
 - Steel coils, IRS 52 kg / UIC 60 rail sections, IS 808 sections, plates, pipes, TMT bars
 - The Legacy Tree structure, vitrines, plinths, reception desk
 - AV hardware (SRD, touch table, LED walls), slat ceilings, the building shell
