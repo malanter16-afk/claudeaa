@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 import uuid
+import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STOPWORDS = {"free", "3d", "model", "models", "dc", "designconnected", "max", "fbx", "obj", "skp",
@@ -79,8 +80,14 @@ def load_wanted(patterns):
             src = os.path.splitext(os.path.basename(path))[0]
             for r in rows:
                 if r.get("name"):
-                    items.append({"source": r.get("source") or src, **r})
-    return items
+                    items.append({**r, "source": r.get("source") or src})
+    seen, unique = set(), []
+    for it in items:  # the same file can match two patterns; the same URL can be listed twice
+        key = (it.get("url"), it["source"], it["name"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(it)
+    return unique
 
 
 def scan_local(dirs, depth=3):
@@ -113,31 +120,88 @@ def match(wanted, local):
     return (best, best_score) if best_score >= 0.75 else (None, best_score)
 
 
+EASY_FORMATS = {".fbx", ".obj", ".glb", ".gltf", ".usd", ".usdc", ".usdz", ".3ds", ".blend", ".dae"}
+HARD_FORMATS = {".max", ".skp"}
+
+
+def local_formats(path):
+    """Model formats inside a local download (zip contents or folder files)."""
+    names = []
+    try:
+        if os.path.isdir(path):
+            names = [f for _, _, fs in os.walk(path) for f in fs]
+        elif path.lower().endswith(".zip"):
+            names = zipfile.ZipFile(path).namelist()
+    except (OSError, zipfile.BadZipFile):
+        return set()
+    return {os.path.splitext(n)[1].lower() for n in names}
+
+
+def format_note(path):
+    exts = local_formats(path)
+    if exts & HARD_FORMATS and not exts & EASY_FORMATS:
+        return f" ⚠ only {'/'.join(sorted(exts & HARD_FORMATS))}: get an FBX/OBJ/3DS version if a source offers one"
+    return ""
+
+
 def cmd_inventory(opts):
+    """Wanted items vs local downloads. Items may carry:
+    match  short phrase used for matching (file names rarely contain the brand)
+    group  need-group, e.g. "Z1 lounge chair"; need = how many items of the group to get (default 1).
+           Once a group has enough downloads, its other alternatives count as covered, not missing.
+    type   "category" = a browse-and-pick task (no file to match); priority 1-3 sorts the missing list."""
     wanted = load_wanted(opts.wanted)
     if not wanted:
         sys.exit("no wanted items found (expects JSON lists or CSV with a 'name' column)")
     local = scan_local(opts.scan)
-    used, have, missing = set(), [], []
+    used, rows = set(), []
     for w in wanted:
-        path, score = match(w, local)
-        (have if path else missing).append((w, path, score))
+        if w.get("type") == "category":
+            rows.append((w, None, 0.0))
+            continue
+        path, score = match({"name": w.get("match") or w["name"]}, local)
+        rows.append((w, path, score))
         if path:
             used.add(path)
+
+    groups = {}
+    for w, path, _ in rows:
+        g = groups.setdefault(w.get("group") or f"_single:{w['name']}", {"need": int(w.get("need", 1)), "have": 0})
+        g["have"] += bool(path)
+    have = [(w, p) for w, p, _ in rows if p]
+    covered = [(w, groups[w.get("group")]) for w, p, _ in rows
+               if not p and w.get("group") and groups[w["group"]]["have"] >= groups[w["group"]]["need"]]
+    covered_ids = {id(w) for w, _ in covered}
+    tasks = [w for w, p, _ in rows if w.get("type") == "category" and id(w) not in covered_ids]
+    missing = [(w, s) for w, p, s in rows
+               if not p and w.get("type") != "category" and id(w) not in covered_ids]
+    missing.sort(key=lambda ws: (int(ws[0].get("priority", 2)), ws[0].get("group") or "", ws[0]["source"]))
+
+    def link(w):
+        return f"[{w['name']}]({w['url']})" if w.get("url") else w["name"]
+
     lines = [f"# Download status ({datetime.date.today().isoformat()})", "",
-             f"**{len(have)} downloaded · {len(missing)} missing** out of {len(wanted)} wanted. "
-             f"Scanned: {', '.join(opts.scan)}", "",
-             f"## Missing ({len(missing)})", ""]
-    for source in sorted({w['source'] for w, _, _ in missing}):
-        lines.append(f"### {source}")
-        for w, _, score in missing:
-            if w["source"] == source:
-                link = f"[{w['name']}]({w['url']})" if w.get("url") else w["name"]
-                hint = f" _(closest local match {score:.0%})_" if score >= 0.5 else ""
-                lines.append(f"- [ ] {link}{hint}")
-        lines.append("")
-    lines += [f"## Downloaded ({len(have)})", ""]
-    lines += [f"- [x] {w['name']} [{w['source']}] → `{os.path.abspath(p)}`" for w, p, _ in have]
+             f"**{len(have)} downloaded · {len(missing)} missing · {len(covered)} covered by an alternative · "
+             f"{len(tasks)} browse tasks** out of {len(wanted)} wanted. Scanned: {', '.join(opts.scan)}", "",
+             f"## Missing, by priority ({len(missing)})", ""]
+    last = None
+    for w, score in missing:
+        head = f"P{w.get('priority', 2)} · {w.get('group') or 'single items'}"
+        if w.get("group"):
+            g = groups[w["group"]]
+            head += f" (need {g['need'] - g['have']} more of {g['need']}; pick ONE alternative per need)"
+        if head != last:
+            lines += ["", f"### {head}"]
+            last = head
+        hint = f" _(closest local match {score:.0%}; check it)_" if score >= 0.5 else ""
+        extra = " · ".join(x for x in (w.get("zone"), w.get("use"), w.get("notes")) if x)
+        lines.append(f"- [ ] {link(w)} [{w['source']}]{hint}" + (f": {extra}" if extra else ""))
+    lines += ["", f"## Browse-and-pick tasks ({len(tasks)})", ""]
+    lines += [f"- [ ] {link(w)} [{w['source']}]: {w.get('use') or ''} {w.get('notes') or ''}".rstrip() for w in tasks]
+    lines += ["", f"## Downloaded ({len(have)})", ""]
+    lines += [f"- [x] {w['name']} [{w['source']}] → `{os.path.abspath(p)}`{format_note(p)}" for w, p in have]
+    lines += ["", f"## Covered by an alternative ({len(covered)}): skip these", ""]
+    lines += [f"- {w['name']} [{w['source']}] ({w['group']}: {g['have']}/{g['need']} downloaded)" for w, g in covered]
     # Only leaf downloads: skip folders that merely contain other found items.
     extra = [p for p in local if p not in used
              and not any(q != p and q.startswith(p + os.sep) for q in local)]
@@ -145,7 +209,7 @@ def cmd_inventory(opts):
     lines += [f"- `{os.path.abspath(p)}`" for p in extra]
     with open(opts.out, "w") as f:
         f.write("\n".join(lines) + "\n")
-    print(f"{len(have)} downloaded, {len(missing)} missing → {opts.out}")
+    print(f"{len(have)} downloaded, {len(missing)} missing, {len(covered)} covered, {len(tasks)} browse tasks → {opts.out}")
 
 
 # ---------------------------------------------------------------- thumbnails
