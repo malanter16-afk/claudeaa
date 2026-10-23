@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><!--TITLE--></title>
+<style>
+:root { --bg:#f6f6f4; --card:#fff; --ink:#1d2330; --muted:#69707d; --line:#e2e3e6; --accent:#1b6fa6; --warn:#a15c00; }
+@media (prefers-color-scheme: dark) { :root { --bg:#14171c; --card:#1d2127; --ink:#e8eaed; --muted:#9aa1ab; --line:#2c3139; --accent:#6db3e8; --warn:#e0a24a; } }
+* { box-sizing: border-box; }
+body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+header { position:sticky; top:0; z-index:2; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 16px; }
+h1 { font-size:18px; margin:0 0 8px; }
+.filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+input, select { font:inherit; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+input[type=search] { flex:1 1 220px; }
+#count { color:var(--muted); margin-left:auto; }
+main { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:12px; padding:16px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; }
+.card img { width:100%; aspect-ratio:1; object-fit:cover; background:var(--line); display:block; }
+.body { padding:10px 12px; display:flex; flex-direction:column; gap:4px; }
+.name { font-weight:600; }
+.meta { color:var(--muted); font-size:12px; }
+.chips { display:flex; flex-wrap:wrap; gap:4px; }
+.chip { font-size:11px; border:1px solid var(--line); border-radius:999px; padding:1px 7px; }
+.chip.tier-hero { border-color:var(--accent); color:var(--accent); }
+.issue { color:var(--warn); font-size:12px; }
+.path { font:11px ui-monospace, monospace; color:var(--muted); word-break:break-all; cursor:copy; }
+</style>
+</head>
+<body>
+<header>
+  <h1><!--TITLE--></h1>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Search name, tags, materials, function…">
+    <select id="category"><option value="">All categories</option></select>
+    <select id="zone"><option value="">All zones</option></select>
+    <select id="theme"><option value="">All themes</option></select>
+    <select id="tier"><option value="">All tiers</option></select>
+    <select id="source"><option value="">All sources</option></select>
+    <span id="count"></span>
+  </div>
+</header>
+<main id="grid"></main>
+<script>
+const DATA = /*DATA*/[];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function fill(id, values) {
+  [...new Set(values)].filter(Boolean).sort().forEach(v => $(id).add(new Option(v, v)));
+}
+fill("category", DATA.map(d => d.category));
+fill("zone", DATA.flatMap(d => d.zones));
+fill("theme", DATA.map(d => d.theme));
+fill("tier", DATA.map(d => d.tier));
+fill("source", DATA.map(d => d.source));
+function render() {
+  const q = $("q").value.toLowerCase().trim();
+  const f = id => $(id).value;
+  const rows = DATA.filter(d =>
+    (!f("category") || d.category === f("category")) &&
+    (!f("zone") || d.zones.includes(f("zone"))) &&
+    (!f("theme") || d.theme === f("theme")) &&
+    (!f("tier") || d.tier === f("tier")) &&
+    (!f("source") || d.source === f("source")) &&
+    (!q || [d.name, d.sub, d.function, d.desc, ...d.tags, ...d.materials].join(" ").toLowerCase().includes(q)));
+  $("count").textContent = `${rows.length} of ${DATA.length}`;
+  $("grid").innerHTML = rows.map(d => `
+    <article class="card">
+      ${d.thumb ? `<img loading="lazy" src="${esc(d.thumb)}" alt="${esc(d.name)}">` : ""}
+      <div class="body">
+        <div class="name">${esc(d.name)}</div>
+        <div class="meta">${esc(d.category)} › ${esc(d.sub)}${d.dims ? " · " + d.dims.map(v => v.toFixed(2)).join(" × ") + " m" : ""}</div>
+        <div class="meta">${esc(d.function)}</div>
+        <div class="chips">
+          <span class="chip tier-${esc(d.tier)}">${esc(d.tier)}</span>
+          <span class="chip">${esc(d.theme)}</span>
+          ${d.zones.map(z => `<span class="chip">${esc(z)}</span>`).join("")}
+        </div>
+        <div class="meta">${esc(d.source)} · licence: ${esc(d.licence)}</div>
+        ${d.issues.map(i => `<div class="issue">⚠ ${esc(i)}</div>`).join("")}
+        <div class="path" title="Click to copy" onclick="navigator.clipboard?.writeText(this.textContent)">${esc(d.blend)}</div>
+      </div>
+    </article>`).join("");
+}
+["q", "category", "zone", "theme", "tier", "source"].forEach(id => $(id).addEventListener("input", render));
+render();
+</script>
+</body>
+</html>

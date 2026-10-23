@@ -77,6 +77,7 @@ python ingest.py run --blender <blender-4.5> [--usd] [--only knoll/barcelona-sto
 ```
 
 - **`kind`:** `architecture` turns off unit guessing and mesh joining (for rooms and buildings).
+- **Per-source defaults:** put a `source.json` with the same fields in `assets/inbox/<source>/`. It applies to every item in that source, so set the licence once for, say, 200 freebies. An item's own `asset.json` overrides it.
 - **`licence`:** items without one are listed as `TODO` after each run, so the licence trail stays complete before any client render.
 
 ## Tested

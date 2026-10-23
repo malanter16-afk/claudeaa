@@ -1,0 +1,26 @@
+{
+  "project": "Interior visualisation of a corporate experience centre (replace with a one-line brief).",
+  "categories": {
+    "seating": ["lounge chair", "side chair", "stool", "sofa", "bench", "beam seating", "office chair"],
+    "tables": ["coffee table", "side table", "dining table", "meeting table", "high table", "desk"],
+    "storage_display": ["shelving", "cabinet", "vitrine", "plinth", "display stand", "reception desk"],
+    "lighting": ["pendant", "floor lamp", "table lamp", "wall light", "track spot", "downlight", "linear"],
+    "decor": ["vase", "sculpture", "books", "wall art", "tray", "clock", "rug", "cushion", "throw"],
+    "plants": ["potted plant", "planter", "tree"],
+    "industrial_artefacts": ["machine", "tool", "steel product", "scale model", "equipment"],
+    "av_tech": ["display", "touch table", "kiosk", "speaker", "sensor", "tablet"],
+    "architecture": ["door", "window", "ceiling element", "wall panel", "partition", "railing", "column"],
+    "people": ["standing", "walking", "seated", "group"],
+    "other": ["other"]
+  },
+  "zones": {
+    "reception": "arrival, reception desk, waiting lounge",
+    "exhibition": "exhibition space with displays and artefacts",
+    "meeting": "meeting and back-office rooms",
+    "cafe": "cafeteria and break areas"
+  },
+  "themes": {
+    "theme_a": "first interior style (describe palette and materials)",
+    "theme_b": "second interior style (describe palette and materials)"
+  }
+}

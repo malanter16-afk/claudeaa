@@ -119,11 +119,15 @@ def pick_model(files, sidecar):
 
 
 def load_sidecar(path):
-    side = os.path.join(path, "asset.json") if os.path.isdir(path) else None
-    if side and os.path.isfile(side):
-        with open(side) as f:
-            return json.load(f)
-    return {}
+    """Per-source defaults (inbox/<source>/source.json) overlaid by per-item asset.json."""
+    data = {}
+    source_defaults = os.path.join(os.path.dirname(path), "source.json")
+    item_file = os.path.join(path, "asset.json") if os.path.isdir(path) else None
+    for side in (source_defaults, item_file):
+        if side and os.path.isfile(side):
+            with open(side) as f:
+                data.update(json.load(f))
+    return data
 
 
 def rel_to_manifest(path, opts):
