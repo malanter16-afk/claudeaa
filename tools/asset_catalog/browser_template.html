@@ -26,13 +26,16 @@ main { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr))
 .chip.tier-hero { border-color:var(--accent); color:var(--accent); }
 .issue { color:var(--warn); font-size:12px; }
 .path { font:11px ui-monospace, monospace; color:var(--muted); word-break:break-all; cursor:copy; }
+.swatches { display:flex; gap:4px; }
+.sw { width:22px; height:22px; border-radius:4px; border:1px solid var(--line); }
+.look { font-size:12.5px; }
 </style>
 </head>
 <body>
 <header>
   <h1><!--TITLE--></h1>
   <div class="filters">
-    <input type="search" id="q" placeholder="Search name, tags, materials, function…">
+    <input type="search" id="q" placeholder="Search looks: black leather, brushed steel, slender legs…">
     <select id="category"><option value="">All categories</option></select>
     <select id="zone"><option value="">All zones</option></select>
     <select id="theme"><option value="">All themes</option></select>
@@ -63,7 +66,8 @@ function render() {
     (!f("theme") || d.theme === f("theme")) &&
     (!f("tier") || d.tier === f("tier")) &&
     (!f("source") || d.source === f("source")) &&
-    (!q || [d.name, d.sub, d.function, d.desc, ...d.tags, ...d.materials].join(" ").toLowerCase().includes(q)));
+    (!q || q.split(/\s+/).every(w => [d.name, d.sub, d.function, d.desc, d.appearance, d.ref, ...d.tags,
+      ...d.materials, ...d.form, ...d.finishes, ...d.palette.map(c => c.name)].join(" ").toLowerCase().includes(w))));
   $("count").textContent = `${rows.length} of ${DATA.length}`;
   $("grid").innerHTML = rows.map(d => `
     <article class="card">
@@ -72,9 +76,16 @@ function render() {
         <div class="name">${esc(d.name)}</div>
         <div class="meta">${esc(d.category)} › ${esc(d.sub)}${d.dims ? " · " + d.dims.map(v => v.toFixed(2)).join(" × ") + " m" : ""}</div>
         <div class="meta">${esc(d.function)}</div>
+        ${d.appearance ? `<div class="look">${esc(d.appearance)}</div>` : ""}
+        ${d.palette.length ? `<div class="swatches">${d.palette.map(c =>
+          `<span class="sw" title="${esc(c.name)} ${esc(c.hex)} (${esc(c.role)})" style="background:${/^#[0-9a-f]{6}$/i.test(c.hex) ? c.hex : "transparent"}"></span>`).join("")}</div>` : ""}
+        ${d.finishes.length ? `<div class="meta">${d.finishes.map(esc).join(" · ")}</div>` : ""}
+        ${d.ref ? `<div class="meta">≈ ${esc(d.ref)}</div>` : ""}
         <div class="chips">
           <span class="chip tier-${esc(d.tier)}">${esc(d.tier)}</span>
           <span class="chip">${esc(d.theme)}</span>
+          ${d.quality ? `<span class="chip">${esc(d.quality)}</span>` : ""}
+          ${d.match === "no" || d.match === "partly" ? `<span class="chip" style="color:var(--warn)">render ≠ maker photo</span>` : ""}
           ${d.zones.map(z => `<span class="chip">${esc(z)}</span>`).join("")}
         </div>
         <div class="meta">${esc(d.source)} · licence: ${esc(d.licence)}</div>
