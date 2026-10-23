@@ -2,7 +2,8 @@
 
     blender -b --python build_library.py -- jobs.json
 jobs.json: [{"blend", "thumb", "out", "catalog_id", "name", "description", "author", "tags"}].
-Each output .blend holds one collection marked as an asset, with catalog, tags and preview, so the
+Each output .blend holds one collection (or, for material swatches, its materials) marked as an asset,
+with catalog, tags and preview, so the
 library folder can be added under Preferences › File Paths › Asset Libraries.
 """
 import json
@@ -27,16 +28,20 @@ def main():
                 for parent in list(obj.users_collection):
                     if parent is not coll:
                         parent.objects.unlink(obj)
-            coll.asset_mark()
-            data = coll.asset_data
-            data.catalog_id = job["catalog_id"]
-            data.description = job["description"]
-            data.author = job["author"]
-            for tag in job["tags"]:
-                data.tags.new(tag, skip_if_exists=True)
-            if job.get("thumb"):
-                with bpy.context.temp_override(id=coll):
-                    bpy.ops.ed.lib_id_load_custom_preview(filepath=job["thumb"])
+            # Material swatches: the materials are the assets (drag onto objects); else the collection.
+            targets = ([m for m in bpy.data.materials if m.users] if job.get("kind") == "material"
+                       else [coll])
+            for target in targets:
+                target.asset_mark()
+                data = target.asset_data
+                data.catalog_id = job["catalog_id"]
+                data.description = job["description"]
+                data.author = job["author"]
+                for tag in job["tags"]:
+                    data.tags.new(tag, skip_if_exists=True)
+                if job.get("thumb"):
+                    with bpy.context.temp_override(id=target):
+                        bpy.ops.ed.lib_id_load_custom_preview(filepath=job["thumb"])
             os.makedirs(os.path.dirname(job["out"]), exist_ok=True)
             bpy.ops.wm.save_as_mainfile(filepath=job["out"], compress=True)
             print(f"[library] {job['name']} -> {job['out']}")

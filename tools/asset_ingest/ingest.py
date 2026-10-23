@@ -32,6 +32,7 @@ EXTENSIONS = ["autodesk_3ds_format", "io_scene_max"]  # ids on extensions.blende
 UNSUPPORTED = {".rfa", ".rvt", ".rte", ".dwg", ".dxf", ".c4d", ".3dm", ".skb", ".ifc",
                ".pln", ".gsm", ".vwx", ".ma", ".mb"}
 PHOTOMETRY = {".ies", ".ldt"}
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".exr", ".tga", ".bmp"}
 SKIP_DIRS = {"__MACOSX"}
 
 
@@ -179,7 +180,14 @@ def ingest_item(opts, source, item, path, manifest):
             entry["warnings"].append("only .ldt photometry: Unreal needs .ies (convert or download the IES)")
 
     model = pick_model(files, sidecar)
-    if model is None:
+    images = [f for f in files if os.path.splitext(f)[1].lower() in IMAGE_EXTS]
+    if model is None and images:
+        # Texture-only download: build PBR material(s) on sample panels.
+        entry["kind"] = "material"
+        if not sidecar.get("real_size_m"):
+            entry["warnings"].append("texture tile size assumed 1.0 m; set real_size_m in asset.json/source.json")
+        model = work
+    elif model is None:
         entry["status"] = "photometry-only" if photometry else "no-usable-model"
         if not photometry:
             entry["warnings"].append(f"no importable model; found: {', '.join(sorted(exts)) or 'nothing'}")
@@ -192,7 +200,9 @@ def ingest_item(opts, source, item, path, manifest):
     args = ["--src", model, "--out-dir", out_dir, "--name", item, "--search-dir", work]
     if sidecar.get("real_height_m"):
         args += ["--real-height", str(sidecar["real_height_m"])]
-    if sidecar.get("kind"):
+    if entry.get("kind") == "material":
+        args += ["--kind", "material", "--tile-size", str(sidecar.get("real_size_m") or 1.0)]
+    elif sidecar.get("kind"):
         args += ["--kind", sidecar["kind"]]
     if opts.usd:
         args.append("--usd")

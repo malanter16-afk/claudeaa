@@ -55,7 +55,7 @@ python tools/asset_catalog/catalog.py browse    --title "My project assets"
 ### `library`
 
 - **Output:** one `.blend` per asset in `assets/library/<Category>/<Subcategory>/`, plus `blender_assets.cats.txt`.
-- **Each asset is a single collection marked as an asset,** with:
+- **Each asset is a single collection marked as an asset** (for material swatches, each **material** is the asset, so you can drag it onto objects), with:
   - its catalog
   - description (including the licence)
   - author (the source)
@@ -72,5 +72,5 @@ python tools/asset_catalog/catalog.py browse    --title "My project assets"
 
 | Status | What |
 |---|---|
-| Tested | Linux, Blender 4.5.15, 23 Oct 2026: `inventory`, `thumbs`, `classify --dry-run` (request and schema construction), `library` (asset marking, catalogs, tags and preview verified by reopening the file), `browse` |
+| Tested | Linux, Blender 4.5.15, 23 Oct 2026: `inventory`, `thumbs`, `classify --dry-run` (request and schema construction), `library` (collection and material assets; marking, catalogs, tags and preview verified by reopening the file), `browse` |
 | Not tested here | Live `classify --yes` / `collect` (no API credentials in the build environment) and the catalogue-aware `ue_import.py` (no Unreal). Run a 3–5 asset batch first and check `catalog.json` |

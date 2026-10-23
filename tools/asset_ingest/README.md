@@ -60,7 +60,12 @@ python ingest.py run --blender <blender-4.5> [--usd] [--only knoll/barcelona-sto
 5. **Normalise:** apply transforms; put the origin at the **bottom centre** of the bounding box.
 6. **Relink and embed textures:** find missing textures in the unpacked folder, then pack/embed them.
 7. **Export** `.blend` / `.glb` / `.fbx` (/`.usdc`) and write `report.json` plus a manifest record.
-8. **Photometry:** copy `.ies`/`.ldt` files to `photometry/`. Unreal's light profiles need **`.ies`**; LDT-only items get a warning.
+8. **Texture-only downloads become materials.** When there's no model but there are images (stone, tile, fabric or cladding swatches):
+   - Maps are recognised from file names: colour/albedo/diffuse, roughness (or gloss, inverted), normal, height/bump, metal.
+   - Each set (e.g. one per colour variant) becomes a Principled material on a 1.2 m sample panel.
+   - Real-world tiling comes from `real_size_m` (one texture tile, in metres; default 1 m, with a warning).
+   - The manifest records `"kind": "material"`; the asset library turns these into **material assets**.
+9. **Photometry:** copy `.ies`/`.ldt` files to `photometry/`. Unreal's light profiles need **`.ies`**; LDT-only items get a warning.
 
 ## `asset.json` (optional, per item folder)
 
@@ -72,11 +77,13 @@ python ingest.py run --blender <blender-4.5> [--usd] [--only knoll/barcelona-sto
   "commercial_ok": true,
   "source_file": "Barcelona_Stool.skp",
   "real_height_m": 0.37,
+  "real_size_m": 0.6,
   "kind": "furniture"
 }
 ```
 
 - **`kind`:** `architecture` turns off unit guessing and mesh joining (for rooms and buildings).
+- **`real_size_m`:** for texture-only items, the real size of one texture tile in metres (e.g. 0.6 for a 60 × 60 cm tile).
 - **Per-source defaults:** put a `source.json` with the same fields in `assets/inbox/<source>/`. It applies to every item in that source, so set the licence once for, say, 200 freebies. An item's own `asset.json` overrides it.
 - **`licence`:** items without one are listed as `TODO` after each run, so the licence trail stays complete before any client render.
 
@@ -84,7 +91,7 @@ python ingest.py run --blender <blender-4.5> [--usd] [--only knoll/barcelona-sto
 
 | Status | What |
 |---|---|
-| Tested | Linux, Blender 4.5.15 LTS, 23 Oct 2026: FBX + textures in a zip (Poly Haven), OBJ in centimetres, Collada inside a nested zip, 3DS (after `setup`), a multi-part FBX, LDT-only and Revit-only items, a clear error for `.skp` without the importer, unchanged-item skipping, `setup` re-runs. Reimported outputs had the right size, the origin at z = 0 and embedded textures |
+| Tested | Linux, Blender 4.5.15 LTS, 23 Oct 2026: FBX + textures in a zip (Poly Haven), texture-only zips becoming materials (map detection, gloss inversion, colour variants), OBJ in centimetres, Collada inside a nested zip, 3DS (after `setup`), a multi-part FBX, LDT-only and Revit-only items, a clear error for `.skp` without the importer, unchanged-item skipping, `setup` re-runs. Reimported outputs had the right size, the origin at z = 0 and embedded textures |
 | Not tested here | Real `.skp` files (needs Windows/macOS), real `.max` files (no sample available) and `ue_import.py` (needs Unreal). Run one item through each before a batch |
 
 ## Known limits

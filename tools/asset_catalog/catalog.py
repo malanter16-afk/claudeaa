@@ -233,8 +233,10 @@ def cmd_classify(opts):
         mapping[cid] = e["id"]
         with open(thumb, "rb") as f:
             img = base64.standard_b64encode(f.read()).decode()
-        meta = {k: e.get(k) for k in ("id", "source", "item", "source_file", "dims_m", "triangles",
-                                      "warnings", "licence")}
+        meta = {k: e.get(k) for k in ("id", "source", "item", "kind", "source_file", "dims_m",
+                                      "triangles", "warnings", "licence")}
+        if e.get("kind") == "material":
+            meta["note"] = "Texture/material swatch shown on 1.2 m sample panels; classify the material."
         requests.append({"custom_id": cid, "params": {
             "model": opts.model,
             "max_tokens": 4000,
@@ -354,7 +356,7 @@ def cmd_library(opts):
         cid = str(uuid.uuid5(uuid.NAMESPACE_URL, "asset-catalog:" + path))
         cats[path] = cid
         safe = re.sub(r"[^\w-]+", "_", e["id"])
-        jobs.append({"blend": out["blend"], "thumb": thumb if os.path.isfile(thumb) else None,
+        jobs.append({"kind": e.get("kind"), "blend": out["blend"], "thumb": thumb if os.path.isfile(thumb) else None,
                      "out": os.path.join(lib, *path.split("/"), safe + ".blend"),
                      "catalog_id": cid, "name": tags["display_name"],
                      "description": f"{tags['description']} | {tags['function']} | licence: {e.get('licence')}",

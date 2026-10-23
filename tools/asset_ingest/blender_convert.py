@@ -4,6 +4,8 @@ Usage (called by ingest.py, not by hand):
     blender -b --python blender_convert.py -- --src FILE --out-dir DIR --name NAME
                 [--search-dir DIR] [--real-height M] [--kind furniture|prop|light|architecture]
                 [--usd]
+    blender -b --python blender_convert.py -- --src FOLDER --kind material --tile-size M ...
+        (texture-only download: PBR material(s) on 1.2 m sample panels)
     blender -b --python blender_convert.py -- --install-addon PYSLAPI.zip
 
 Normalisation: 1 unit = 1 m, transforms applied, origin at the bottom centre of the
@@ -145,8 +147,8 @@ def choose_unit_factor(ext, dims, real_height, kind, warnings):
         if dims.z <= 0:
             raise RuntimeError("Asset has zero height; cannot scale to real height.")
         return float(real_height) / dims.z, "real_height"
-    if kind == "architecture":
-        return 1.0, "kind=architecture (no guess)"
+    if kind in ("architecture", "material"):
+        return 1.0, f"kind={kind} (no guess)"
     largest = max(dims)
     for f in UNIT_CANDIDATES.get(ext, UNIT_CANDIDATES["default"]):
         if PLAUSIBLE_M[0] <= largest * f <= PLAUSIBLE_M[1]:
@@ -264,6 +266,109 @@ def export_all(out_dir, name, want_usd, kind, warnings):
     return outputs
 
 
+# Texture-only downloads (material swatches). First matching slot wins; order matters.
+MAP_SLOTS = [
+    ("normal", {"normal", "nrm", "nor", "norm", "normalgl", "normaldx"}),
+    ("rough", {"roughness", "rough", "rgh"}),
+    ("gloss", {"gloss", "glossiness", "glossy"}),
+    ("metal", {"metallic", "metalness", "metal"}),
+    ("height", {"height", "disp", "displacement", "bump"}),
+    ("ao", {"ao", "occlusion", "ambientocclusion"}),
+    ("base", {"basecolor", "albedo", "diffuse", "diff", "color", "colour", "col"}),
+]
+SHORT_SUFFIX = {"n": "normal", "r": "rough", "d": "base", "h": "height"}
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".exr", ".tga", ".bmp"}
+SKIP_WORDS = {"preview", "thumb", "thumbnail", "icon", "render", "logo"}
+PANEL_M = 1.2
+
+
+def map_slot(token):
+    for slot, words in MAP_SLOTS:
+        if token in words:
+            return slot
+    return SHORT_SUFFIX.get(token)
+
+
+def texture_groups(folder):
+    """Group images into materials: 'marble_white_rough_2k.jpg' -> group 'marble white', slot 'rough'.
+    The map word is the last non-resolution token, so names like 'metal_plate_diffuse' stay correct."""
+    groups = {}
+    for root, _, files in os.walk(folder):
+        for f in files:
+            stem, ext = os.path.splitext(f)
+            if ext.lower() not in IMAGE_EXTS or f.startswith("._"):
+                continue
+            toks = "".join(c if c.isalnum() else " " for c in stem.lower()).split()
+            if SKIP_WORDS & set(toks):
+                continue
+            core = [t for t in toks if not (t[:-1].isdigit() and t[-1] == "k") and not t.isdigit()] or toks
+            slot = map_slot(core[-1]) if core else None
+            key = " ".join(core[:-1] if slot and len(core) > 1 else core) or stem
+            groups.setdefault(key, {})[slot or "base"] = os.path.join(root, f)
+    return {k: v for k, v in groups.items() if "base" in v or len(v) > 1}
+
+
+def build_material(name, maps, tile_m):
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nodes, links = mat.node_tree.nodes, mat.node_tree.links
+    bsdf = nodes["Principled BSDF"]
+    coord, mapping = nodes.new("ShaderNodeTexCoord"), nodes.new("ShaderNodeMapping")
+    mapping.inputs["Scale"].default_value = (1 / tile_m,) * 3
+    links.new(coord.outputs["UV"], mapping.inputs["Vector"])
+
+    def tex(path, colour):
+        node = nodes.new("ShaderNodeTexImage")
+        node.image = bpy.data.images.load(path, check_existing=True)
+        node.image.colorspace_settings.name = "sRGB" if colour else "Non-Color"
+        links.new(mapping.outputs["Vector"], node.inputs["Vector"])
+        return node
+
+    if "base" in maps:
+        links.new(tex(maps["base"], True).outputs["Color"], bsdf.inputs["Base Color"])
+    if "rough" in maps:
+        links.new(tex(maps["rough"], False).outputs["Color"], bsdf.inputs["Roughness"])
+    elif "gloss" in maps:
+        inv = nodes.new("ShaderNodeInvert")
+        links.new(tex(maps["gloss"], False).outputs["Color"], inv.inputs["Color"])
+        links.new(inv.outputs["Color"], bsdf.inputs["Roughness"])
+    if "metal" in maps:
+        links.new(tex(maps["metal"], False).outputs["Color"], bsdf.inputs["Metallic"])
+    normal_out = None
+    if "normal" in maps:
+        nmap = nodes.new("ShaderNodeNormalMap")
+        links.new(tex(maps["normal"], False).outputs["Color"], nmap.inputs["Color"])
+        normal_out = nmap.outputs["Normal"]
+    if "height" in maps:
+        bump = nodes.new("ShaderNodeBump")
+        bump.inputs["Strength"].default_value = 0.2
+        links.new(tex(maps["height"], False).outputs["Color"], bump.inputs["Height"])
+        if normal_out is not None:
+            links.new(normal_out, bump.inputs["Normal"])
+        normal_out = bump.outputs["Normal"]
+    if normal_out is not None:
+        links.new(normal_out, bsdf.inputs["Normal"])
+    return mat
+
+
+def build_material_panels(folder, tile_m, warnings):
+    groups = texture_groups(folder)
+    if not groups:
+        raise RuntimeError("No texture images found for a material.")
+    for i, (key, maps) in enumerate(sorted(groups.items())):
+        name = key.title()[:60]
+        bpy.ops.mesh.primitive_plane_add(size=PANEL_M, location=(i * (PANEL_M + 0.2), 0, PANEL_M / 2),
+                                         rotation=(1.5708, 0, 0))
+        panel = bpy.context.object
+        panel.name = name
+        for loop in panel.data.uv_layers.active.data:  # 1 UV unit = 1 m
+            loop.uv = loop.uv * PANEL_M
+        panel.data.materials.append(build_material(name, maps, tile_m))
+        if "base" not in maps:
+            warnings.append(f"{name}: no colour map found ({', '.join(sorted(maps))})")
+    return [k.title() for k in sorted(groups)]
+
+
 def main():
     args = parse_args()
     if "install_addon" in args:
@@ -275,7 +380,13 @@ def main():
     report = {"source_file": src, "ok": False}
     try:
         bpy.ops.wm.read_homefile(use_empty=True)
-        ext = import_file(src)
+        if args.get("kind") == "material":
+            tile = float(args.get("tile_size") or 1.0)
+            report["materials_built"] = build_material_panels(src, tile, warnings)
+            report["tile_size_m"] = tile
+            ext = "material"
+        else:
+            ext = import_file(src)
         report["format"] = ext
         report["removed"] = clean_scene()
         report["unit_factor"], report["unit_method"] = normalise(
