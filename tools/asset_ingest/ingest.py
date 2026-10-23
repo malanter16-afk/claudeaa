@@ -210,6 +210,14 @@ def ingest_item(opts, source, item, path, manifest):
 
     report_path = os.path.join(out_dir, "report.json")
     report = json.load(open(report_path)) if os.path.isfile(report_path) else {}
+    if not report.get("ok") and "No mesh geometry" in report.get("error", "") and images:
+        # e.g. a texture download that also ships a material-only .blend/.usdc: build the material instead
+        entry["kind"], model = "material", work
+        entry["warnings"].append("model file had no geometry; built a material from the textures instead")
+        args = ["--src", work, "--out-dir", out_dir, "--name", item, "--kind", "material",
+                "--tile-size", str(sidecar.get("real_size_m") or 1.0)] + (["--usd"] if opts.usd else [])
+        code = run_blender(opts.blender, args, os.path.join(out_dir, "convert.log"))
+        report = json.load(open(report_path)) if os.path.isfile(report_path) else {}
     entry.update({k: report.get(k) for k in ("format", "dims_m", "triangles", "unit_factor",
                                             "unit_method", "meshes_without_uv")})
     entry["outputs"] = {k: rel_to_manifest(v, opts) for k, v in (report.get("outputs") or {}).items()}

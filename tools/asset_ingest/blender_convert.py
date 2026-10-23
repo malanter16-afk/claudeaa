@@ -279,6 +279,8 @@ MAP_SLOTS = [
 SHORT_SUFFIX = {"n": "normal", "r": "rough", "d": "base", "h": "height"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".exr", ".tga", ".bmp"}
 SKIP_WORDS = {"preview", "thumb", "thumbnail", "icon", "render", "logo"}
+# Suffixes that follow the map word, e.g. Poly Haven 'marble_01_nor_gl_2k', ambientCG '_2K-JPG_Color'.
+NOISE_TOKENS = {"gl", "dx", "jpg", "jpeg", "png", "tif", "tiff", "exr", "map", "tex", "texture"}
 PANEL_M = 1.2
 
 
@@ -301,7 +303,8 @@ def texture_groups(folder):
             toks = "".join(c if c.isalnum() else " " for c in stem.lower()).split()
             if SKIP_WORDS & set(toks):
                 continue
-            core = [t for t in toks if not (t[:-1].isdigit() and t[-1] == "k") and not t.isdigit()] or toks
+            core = [t for t in toks if not (t[:-1].isdigit() and t[-1] == "k") and not t.isdigit()
+                    and t not in NOISE_TOKENS] or toks
             slot = map_slot(core[-1]) if core else None
             key = " ".join(core[:-1] if slot and len(core) > 1 else core) or stem
             groups.setdefault(key, {})[slot or "base"] = os.path.join(root, f)
