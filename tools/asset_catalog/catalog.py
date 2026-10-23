@@ -137,12 +137,12 @@ def cmd_inventory(opts):
                 lines.append(f"- [ ] {link}{hint}")
         lines.append("")
     lines += [f"## Downloaded ({len(have)})", ""]
-    lines += [f"- [x] {w['name']} → `{os.path.relpath(p)}`" for w, p, _ in have]
+    lines += [f"- [x] {w['name']} [{w['source']}] → `{os.path.abspath(p)}`" for w, p, _ in have]
     # Only leaf downloads: skip folders that merely contain other found items.
     extra = [p for p in local if p not in used
              and not any(q != p and q.startswith(p + os.sep) for q in local)]
     lines += ["", f"## Local downloads not in any wanted list ({len(extra)})", ""]
-    lines += [f"- `{os.path.relpath(p)}`" for p in extra]
+    lines += [f"- `{os.path.abspath(p)}`" for p in extra]
     with open(opts.out, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"{len(have)} downloaded, {len(missing)} missing → {opts.out}")
