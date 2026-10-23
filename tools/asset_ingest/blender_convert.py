@@ -25,6 +25,7 @@ SKP_ADDON = "sketchup_importer"
 # inches before centimetres; most other untyped formats (OBJ) are centimetres.
 UNIT_CANDIDATES = {
     ".skp": [1.0, 0.0254, 0.01, 0.001],
+    ".max": [1.0, 0.0254, 0.01, 0.001],  # 3ds Max scenes are often in inches
     "default": [1.0, 0.01, 0.001, 0.0254],
 }
 PLAUSIBLE_M = (0.02, 8.0)
@@ -52,13 +53,26 @@ def install_addon(zip_path):
     print(f"[convert] installed and enabled {SKP_ADDON}")
 
 
+def op_exists(module, name):
+    # hasattr() is always True on bpy.ops; only a registered operator has an RNA type.
+    try:
+        getattr(getattr(bpy.ops, module), name).get_rna_type()
+        return True
+    except (KeyError, AttributeError):
+        return False
+
+
+def require_op(module, name, fix):
+    if not op_exists(module, name):
+        raise RuntimeError(f"bpy.ops.{module}.{name} is not available. {fix}")
+
+
 def ensure_skp_importer():
-    if not hasattr(bpy.ops.import_scene, "skp"):
+    if not op_exists("import_scene", "skp"):
         addon_utils.enable(SKP_ADDON, default_set=True)
-    if not hasattr(bpy.ops.import_scene, "skp"):
-        raise RuntimeError(
-            "SketchUp importer not available. Run `ingest.py setup-skp --zip <pyslapi release zip>` "
-            "on Windows or macOS (the SketchUp SDK has no Linux build).")
+    require_op("import_scene", "skp",
+               "Run `ingest.py setup --skp-zip <pyslapi release zip>` on Windows or macOS "
+               "(the SketchUp SDK has no Linux build).")
 
 
 def import_file(path):
@@ -72,17 +86,18 @@ def import_file(path):
     elif ext in (".usd", ".usda", ".usdc", ".usdz"):
         bpy.ops.wm.usd_import(filepath=path)
     elif ext == ".dae":
-        if not hasattr(bpy.ops.wm, "collada_import"):
-            raise RuntimeError("This Blender has no Collada importer; use Blender 4.5 LTS as the converter.")
+        require_op("wm", "collada_import", "Use Blender 4.5 LTS as the converter (5.x has no Collada).")
         bpy.ops.wm.collada_import(filepath=path)
     elif ext == ".stl":
         bpy.ops.wm.stl_import(filepath=path)
     elif ext == ".ply":
         bpy.ops.wm.ply_import(filepath=path)
     elif ext == ".3ds":
-        if not hasattr(bpy.ops.import_scene, "max3ds"):
-            raise RuntimeError("3DS importer extension (io_scene_3ds) is not installed in the converter Blender.")
+        require_op("import_scene", "max3ds", "Run `ingest.py setup` to install the 3DS extension.")
         bpy.ops.import_scene.max3ds(filepath=path)
+    elif ext == ".max":
+        require_op("import_scene", "max", "Run `ingest.py setup` to install the MAX extension.")
+        bpy.ops.import_scene.max(filepath=path)
     elif ext == ".skp":
         ensure_skp_importer()
         bpy.ops.import_scene.skp(filepath=path, import_camera=False, scenes_as_camera=False,

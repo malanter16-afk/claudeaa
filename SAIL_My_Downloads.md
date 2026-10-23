@@ -13,9 +13,9 @@ Links were researched on 23 Oct 2026 and every one was opened from a script. Sit
 ## 0. Before you start
 
 **Where files go:** drop every download, still zipped, into `assets/inbox/<source>/<item>/`
-(e.g. `assets/inbox/knoll/barcelona-stool/`). The project's ingest tool ([tools/asset_ingest](tools/asset_ingest/README.md)) unpacks, converts (including SketchUp and Collada), fixes scale and origin, embeds textures, writes the licence manifest and imports into Unreal. No manual conversion.
+(e.g. `assets/inbox/knoll/barcelona-stool/`). The project's ingest tool ([tools/asset_ingest](tools/asset_ingest/README.md)) unpacks, converts (SketchUp, Collada, 3DS, 3ds Max), fixes scale and origin, embeds textures, writes the licence manifest and imports into Unreal. No manual conversion.
 
-**Format to pick:** FBX → OBJ → glTF → SKP → Collada. On manufacturer pages with a format menu (e.g. Knoll: Revit / 2D AutoCAD / 3D AutoCAD / SketchUp) take **SketchUp** (or *All Files*). The tool can't use Revit, DWG or 3ds Max files. Lighting: download **`.ies`** (Unreal needs IES; LDT is not converted).
+**Format to pick:** FBX → OBJ → glTF → SKP → Collada. On manufacturer pages with a format menu (e.g. Knoll: Revit / 2D AutoCAD / 3D AutoCAD / SketchUp) take **SketchUp** (or *All Files*). The tool can't use Revit, DWG or DXF files. Lighting: download **`.ies`** (Unreal needs IES; LDT is not converted).
 
 **Licence rule:** the renders go to SAIL in a pitch, so treat it as commercial use. Nothing here is pirated, non-commercial or research-only.
 Use manufacturer models in scenes and renders, but never pass the model files themselves on to anyone. Credit CC-BY authors in `ATTRIBUTIONS.md` (the ingest tool's manifest feeds it).

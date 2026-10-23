@@ -3,7 +3,7 @@
 
     python ingest.py run   --blender PATH [--inbox assets/inbox] [--out assets/normalized]
                            [--manifest assets/manifest.json] [--only SOURCE/ITEM] [--force] [--usd]
-    python ingest.py setup-skp --blender PATH --zip pyslapi-release.zip
+    python ingest.py setup --blender PATH [--skp-zip pyslapi-release.zip]
 
 Layout: every download lives in assets/inbox/<source>/<item>/ (zips are fine, kept as
 downloaded) or as assets/inbox/<source>/<item>.zip. An optional asset.json in the item
@@ -24,10 +24,12 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONVERTER = os.path.join(HERE, "blender_convert.py")
 
-# Best first. .skp needs the pyslapi add-on (Windows/macOS); .dae needs Blender <= 4.5.
+# Best first. .skp needs the pyslapi add-on (Windows/macOS); .dae needs Blender <= 4.5;
+# .3ds and .max need the extensions installed by `setup`.
 MODEL_PRIORITY = [".blend", ".glb", ".gltf", ".fbx", ".usdc", ".usd", ".usdz", ".usda",
-                  ".obj", ".dae", ".skp", ".3ds", ".stl", ".ply"]
-UNSUPPORTED = {".rfa", ".rvt", ".rte", ".dwg", ".dxf", ".max", ".c4d", ".3dm", ".skb", ".ifc",
+                  ".obj", ".dae", ".skp", ".3ds", ".max", ".stl", ".ply"]
+EXTENSIONS = ["autodesk_3ds_format", "io_scene_max"]  # ids on extensions.blender.org
+UNSUPPORTED = {".rfa", ".rvt", ".rte", ".dwg", ".dxf", ".c4d", ".3dm", ".skb", ".ifc",
                ".pln", ".gsm", ".vwx", ".ma", ".mb"}
 PHOTOMETRY = {".ies", ".ldt"}
 SKIP_DIRS = {"__MACOSX"}
@@ -236,10 +238,34 @@ def cmd_run(opts):
     return 1 if failed else 0
 
 
-def cmd_setup_skp(opts):
-    code = subprocess.run([opts.blender, "-b", "--python-exit-code", "1", "--python", CONVERTER,
-                           "--", "--install-addon", opts.zip]).returncode
-    return code
+def cmd_setup(opts):
+    """Install the 3DS/MAX importer extensions (and optionally the SketchUp add-on)."""
+    steps = [[opts.blender, "--online-mode", "-c", "extension", "sync"]]
+    steps += [[opts.blender, "--online-mode", "-c", "extension", "install", "-s", "-e", ext]
+              for ext in EXTENSIONS]
+    if opts.skp_zip:
+        steps.append([opts.blender, "-b", "--python-exit-code", "1", "--python", CONVERTER,
+                      "--", "--install-addon", opts.skp_zip])
+    for cmd in steps:
+        print("$", " ".join(cmd[1:]))
+        subprocess.run(cmd)  # "already installed" exits non-zero; the check below decides
+    wanted = ["import_scene.max3ds", "import_scene.max"] + (["import_scene.skp"] if opts.skp_zip else [])
+    check = ("import bpy, addon_utils, sys\n"
+             "addon_utils.enable('sketchup_importer', default_set=True)\n"
+             "def ok(op):\n"
+             "    m, n = op.split('.')\n"
+             "    try:\n"
+             "        getattr(getattr(bpy.ops, m), n).get_rna_type(); return True\n"
+             "    except (KeyError, AttributeError):\n"
+             "        return False\n"
+             f"missing = [op for op in {wanted!r} if not ok(op)]\n"
+             "print('MISSING', missing)\n"
+             "sys.exit(1 if missing else 0)\n")
+    result = subprocess.run([opts.blender, "-b", "--python-exit-code", "1", "--python-expr", check],
+                            capture_output=True, text=True)
+    line = next((l for l in result.stdout.splitlines() if l.startswith("MISSING")), "MISSING ?")
+    print("importers ready" if result.returncode == 0 else f"setup incomplete: {line}")
+    return result.returncode
 
 
 def main():
@@ -256,12 +282,12 @@ def main():
     r.add_argument("--force", action="store_true", help="reconvert unchanged items")
     r.add_argument("--usd", action="store_true", help="also export .usdc")
 
-    s = sub.add_parser("setup-skp", help="install the pyslapi SketchUp importer into the converter Blender")
+    s = sub.add_parser("setup", help="install importers into the converter Blender (run once)")
     s.add_argument("--blender", default=blender_default)
-    s.add_argument("--zip", required=True)
+    s.add_argument("--skp-zip", help="pyslapi release zip (SketchUp; Windows/macOS only)")
 
     opts = p.parse_args()
-    sys.exit(cmd_run(opts) if opts.cmd == "run" else cmd_setup_skp(opts))
+    sys.exit(cmd_run(opts) if opts.cmd == "run" else cmd_setup(opts))
 
 
 if __name__ == "__main__":

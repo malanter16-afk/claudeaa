@@ -1,6 +1,6 @@
 # asset_ingest
 
-Turns manually downloaded 3D assets (manufacturer zips, SketchUp/Collada/FBX/OBJ files, IES photometry) into consistent files for **Blender → Unreal**. Nobody converts anything by hand.
+Turns manually downloaded 3D assets (manufacturer zips, SketchUp/Collada/FBX/OBJ/3DS/3ds Max files, IES photometry) into consistent files for **Blender → Unreal**. Nobody converts anything by hand.
 
 ```
 assets/inbox/<source>/<item>/...      what you download, untouched (zips are fine)
@@ -24,12 +24,13 @@ assets/manifest.json                   one record per item (licence, size, outpu
 - **Python 3.9+** to run `ingest.py` (standard library only).
 - **Blender 4.5 LTS as the converter.** As far as I know, Blender 5.x removed Collada import, while 4.5 still has it and opens everything else. Your scene work can stay on 5.x: it opens 4.5 `.blend` files.
   - Point `--blender` at it, or set `BLENDER_CONVERTER`.
-- **SketchUp `.skp` only:**
-  - Runs on **Windows or macOS** (the SketchUp SDK has no Linux build).
-  - Needs the free [pyslapi importer](https://github.com/martijnberger/pyslapi/releases), which supports SketchUp files up to 2025.1 and Blender 4.x. Install it into the converter once:
-    ```
-    python ingest.py setup-skp --blender "C:/Program Files/Blender Foundation/Blender 4.5/blender.exe" --zip pyslapi.zip
-    ```
+- **One-time setup** installs the importers that Blender doesn't ship:
+  ```
+  python ingest.py setup --blender "C:/Program Files/Blender Foundation/Blender 4.5/blender.exe" [--skp-zip pyslapi.zip]
+  ```
+  - Without arguments: installs the **3DS** (`autodesk_3ds_format`) and **3ds Max `.max`** (`io_scene_max`) importers from extensions.blender.org. Needs internet once.
+  - **`--skp-zip`, for SketchUp `.skp`:** also installs the free [pyslapi importer](https://github.com/martijnberger/pyslapi/releases) (SketchUp files up to 2025.1, Blender 4.x). **Windows or macOS only**: the SketchUp SDK has no Linux build.
+  - Safe to re-run. It finishes by checking that each importer actually loads.
 - **Unreal step:** UE 5.x with the Python Editor Script Plugin enabled.
 
 ## Use
@@ -49,8 +50,9 @@ python ingest.py run --blender <blender-4.5> [--usd] [--only knoll/barcelona-sto
 ### What happens to each item
 
 1. **Unpack:** zips (and zips inside zips) are unpacked into `assets/normalized/_work/`.
-2. **Pick a model, best format first:** `.blend` › `.glb/.gltf` › `.fbx` › `.usd*` › `.obj` › `.dae` › `.skp` › `.3ds` › `.stl/.ply`. If there are several of one type, the largest wins.
-   - Revit, DWG/DXF, 3ds Max, Cinema 4D, Rhino and ArchiCAD files are recorded as `unsupported_files` and ignored. Download an FBX/OBJ/SKP version of those instead.
+2. **Pick a model, best format first:** `.blend` › `.glb/.gltf` › `.fbx` › `.usd*` › `.obj` › `.dae` › `.skp` › `.3ds` › `.max` › `.stl/.ply`. If there are several of one type, the largest wins.
+   - Revit, DWG/DXF, Cinema 4D, Rhino and ArchiCAD files are recorded as `unsupported_files` and ignored. Download an FBX/OBJ/SKP version of those instead.
+   - `.max` brings in geometry, but V-Ray/Corona materials don't survive. Expect to re-material.
 3. **Import headless in Blender,** then remove cameras, lights and 2D linework.
 4. **Fix the scale:** 1 unit = 1 m.
    - SketchUp works in inches and many OBJ files are in centimetres, so the unit is **guessed** and flagged as a warning.
@@ -81,8 +83,8 @@ python ingest.py run --blender <blender-4.5> [--usd] [--only knoll/barcelona-sto
 
 | Status | What |
 |---|---|
-| Tested | Linux, Blender 4.5.15 LTS, 23 Oct 2026: FBX + textures in a zip (Poly Haven), OBJ in centimetres, Collada inside a nested zip, a multi-part FBX, LDT-only and Revit-only items, unchanged-item skipping. Reimported outputs had the right size, the origin at z = 0 and embedded textures |
-| Not tested here | `.skp` (needs Windows/macOS) and `ue_import.py` (needs Unreal). Run one item through each before a batch |
+| Tested | Linux, Blender 4.5.15 LTS, 23 Oct 2026: FBX + textures in a zip (Poly Haven), OBJ in centimetres, Collada inside a nested zip, 3DS (after `setup`), a multi-part FBX, LDT-only and Revit-only items, a clear error for `.skp` without the importer, unchanged-item skipping, `setup` re-runs. Reimported outputs had the right size, the origin at z = 0 and embedded textures |
+| Not tested here | Real `.skp` files (needs Windows/macOS), real `.max` files (no sample available) and `ue_import.py` (needs Unreal). Run one item through each before a batch |
 
 ## Known limits
 
