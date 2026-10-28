@@ -2,7 +2,7 @@
 
 Usage (called by ingest.py, not by hand):
     blender -b --python blender_convert.py -- --src FILE --out-dir DIR --name NAME
-                [--search-dir DIR] [--real-height M] [--kind furniture|prop|light|architecture]
+                [--search-dir DIR] [--real-height M] [--kind furniture|prop|light|large|architecture]
                 [--usd]
     blender -b --python blender_convert.py -- --src FOLDER --kind material --tile-size M ...
         (texture-only download: PBR material(s) on 1.2 m sample panels)
@@ -13,6 +13,7 @@ bounding box, cameras/lights/edge-only meshes removed, textures relinked and pac
 Writes report.json next to the outputs.
 """
 import json
+import math
 import os
 import sys
 
@@ -31,6 +32,9 @@ UNIT_CANDIDATES = {
     "default": [1.0, 0.01, 0.001, 0.0254],
 }
 PLAUSIBLE_M = (0.02, 8.0)
+# These formats carry real units (glTF is metres by spec; USD/.blend store their scale), so a
+# 30 m tank or crane is trusted rather than "guessed" down to furniture size.
+UNIT_EXACT = {".glb", ".gltf", ".usd", ".usdc", ".usda", ".usdz", ".blend"}
 
 
 def parse_args():
@@ -142,13 +146,17 @@ def world_bbox(objs):
     return lo, hi
 
 
-def choose_unit_factor(ext, dims, real_height, kind, warnings):
+def choose_unit_factor(ext, dims, real_height, kind, warnings, scale=None):
     if real_height:
         if dims.z <= 0:
             raise RuntimeError("Asset has zero height; cannot scale to real height.")
         return float(real_height) / dims.z, "real_height"
-    if kind in ("architecture", "material"):
+    if scale:
+        return float(scale), "file units"
+    if kind in ("architecture", "material", "large"):
         return 1.0, f"kind={kind} (no guess)"
+    if ext in UNIT_EXACT:
+        return 1.0, "file units"
     largest = max(dims)
     for f in UNIT_CANDIDATES.get(ext, UNIT_CANDIDATES["default"]):
         if PLAUSIBLE_M[0] <= largest * f <= PLAUSIBLE_M[1]:
@@ -160,12 +168,12 @@ def choose_unit_factor(ext, dims, real_height, kind, warnings):
     return 1.0, "fallback"
 
 
-def normalise(ext, real_height, kind, warnings):
+def normalise(ext, real_height, kind, warnings, scale=None):
     meshes = mesh_objects()
     if not meshes:
         raise RuntimeError("No mesh geometry after import.")
     lo, hi = world_bbox(meshes)
-    factor, how = choose_unit_factor(ext, hi - lo, real_height, kind, warnings)
+    factor, how = choose_unit_factor(ext, hi - lo, real_height, kind, warnings, scale)
     offset = Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z))
     xform = Matrix.Scale(factor, 4) @ Matrix.Translation(-offset)
 
@@ -390,10 +398,14 @@ def main():
             ext = "material"
         else:
             ext = import_file(src)
+            if args.get("up") == "z":  # CAD meshed to glTF keeps Z-up coordinates: stand it upright
+                turn = Matrix.Rotation(-math.pi / 2, 4, "X")
+                for obj in [o for o in bpy.context.scene.objects if o.parent is None]:
+                    obj.matrix_world = turn @ obj.matrix_world
         report["format"] = ext
         report["removed"] = clean_scene()
         report["unit_factor"], report["unit_method"] = normalise(
-            ext, args.get("real_height"), args.get("kind"), warnings)
+            ext, args.get("real_height"), args.get("kind"), warnings, args.get("scale"))
         report["missing_textures"] = relink_and_pack(args.get("search_dir"), warnings)
         report.update(stats())
         report["outputs"] = export_all(out_dir, name, args["usd"], args.get("kind"), warnings)

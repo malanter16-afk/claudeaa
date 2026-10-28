@@ -98,6 +98,47 @@
       "cladding",
       "resin floor"
     ],
+    "plant_equipment": [
+      "pump",
+      "valve",
+      "tank",
+      "pressure vessel",
+      "pipe and fittings",
+      "pipe rack",
+      "conveyor",
+      "motor",
+      "control panel",
+      "machine tool",
+      "crane"
+    ],
+    "vehicles_machinery": [
+      "forklift",
+      "truck",
+      "excavator",
+      "loader",
+      "mobile crane",
+      "car",
+      "trailer"
+    ],
+    "site_and_infrastructure": [
+      "scaffolding",
+      "formwork",
+      "barrier",
+      "site cabin",
+      "container",
+      "fence",
+      "signage",
+      "street furniture",
+      "racking",
+      "pallet"
+    ],
+    "safety_ppe": [
+      "hard hat",
+      "hi-vis",
+      "extinguisher",
+      "safety sign",
+      "first aid"
+    ],
     "other": [
       "other"
     ]
@@ -111,5 +152,20 @@
   "themes": {
     "theme_a": "first interior style (describe palette and materials)",
     "theme_b": "second interior style (describe palette and materials)"
+  },
+  "space_types": {
+    "residential": "homes, apartments, villas",
+    "office": "workplaces, meeting rooms, reception, co-working",
+    "retail_showroom": "shops, showrooms, experience centres, brand spaces",
+    "hospitality": "hotels, restaurants, cafes, lounges",
+    "healthcare_lab": "hospitals, clinics, laboratories, cleanrooms",
+    "education_culture": "schools, campuses, museums, galleries, auditoriums",
+    "factory_plant": "manufacturing halls, steel plants, workshops, control rooms",
+    "oil_gas_refinery": "refineries, petrochemical plants, tank farms, pipelines, offshore",
+    "power_utilities": "power plants, substations, water treatment",
+    "warehouse_logistics": "warehouses, distribution centres, docks, cold stores",
+    "construction_site": "building sites, scaffolding, formwork, site cabins, heavy machinery",
+    "transport_infrastructure": "streets, parking, rail, ports, airports, bridges",
+    "outdoor_landscape": "gardens, parks, plazas, natural terrain"
   }
 }

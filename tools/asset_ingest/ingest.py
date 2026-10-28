@@ -27,7 +27,11 @@ CONVERTER = os.path.join(HERE, "blender_convert.py")
 # Best first. .skp needs the pyslapi add-on (Windows/macOS); .dae needs Blender <= 4.5;
 # .3ds and .max need the extensions installed by `setup`.
 MODEL_PRIORITY = [".blend", ".glb", ".gltf", ".fbx", ".usdc", ".usd", ".usdz", ".usda",
-                  ".obj", ".dae", ".skp", ".3ds", ".max", ".stl", ".ply"]
+                  ".obj", ".dae", ".skp", ".3ds", ".max", ".step", ".stp", ".iges", ".igs",
+                  ".stl", ".ply"]
+# Engineering CAD (manufacturer equipment: pumps, valves, cranes, racking) is meshed to .glb
+# first with cascadio (OpenCASCADE; `pip install cascadio`), keeping part colours and real units.
+CAD_EXTS = {".step": "step", ".stp": "step", ".iges": "iges", ".igs": "iges"}
 EXTENSIONS = ["autodesk_3ds_format", "io_scene_max"]  # ids on extensions.blender.org
 UNSUPPORTED = {".rfa", ".rvt", ".rte", ".dwg", ".dxf", ".c4d", ".3dm", ".skb", ".ifc",
                ".pln", ".gsm", ".vwx", ".ma", ".mb"}
@@ -136,6 +140,53 @@ def rel_to_manifest(path, opts):
     return os.path.relpath(os.path.abspath(path), os.path.dirname(os.path.abspath(opts.manifest)))
 
 
+def cad_to_glb(path, tol_m):
+    """Mesh a STEP/IGES file to .glb next to it (glTF is metres, so units come out right)."""
+    try:
+        import cascadio
+    except ImportError:
+        raise RuntimeError("STEP/IGES needs cascadio: run `ingest.py setup` or `pip install cascadio`")
+    out = os.path.splitext(path)[0] + ".glb"
+    with open(path, "rb") as f:
+        data = cascadio.load(f.read(), file_type=CAD_EXTS[os.path.splitext(path)[1].lower()],
+                             tol_linear=tol_m, tol_angular=0.3)
+    with open(out, "wb") as f:
+        f.write(data)
+    return out
+
+
+IGES_UNITS_M = {1: 0.0254, 2: 0.001, 4: 0.3048, 5: 1609.344, 6: 1.0, 7: 1000.0, 8: 2.54e-5,
+                9: 1e-6, 10: 0.01, 11: 2.54e-8}
+
+
+def iges_unit_m(path):
+    """Metres per IGES model unit, from the Global section (parameter 14); cascadio ignores it."""
+    with open(path, "rb") as f:
+        text = "".join(l[:72].decode("latin-1") for l in f if len(l) > 72 and l[72:73] == b"G")
+    params, i, delim = [], 0, ","
+    if text[:2] != ",,":  # parameter 1 may redefine the delimiter as a Hollerith string, e.g. 1H,
+        delim = text[2] if text[1:2] == "H" else ","
+    while i < len(text) and len(params) < 15:
+        j = i
+        while j < len(text) and text[j].isdigit():
+            j += 1
+        if j > i and j < len(text) and text[j] == "H":  # nH... string: skip n characters
+            n = int(text[i:j])
+            params.append(text[j + 1:j + 1 + n])
+            i = j + 1 + n
+        else:
+            k = i
+            while k < len(text) and text[k] not in (delim, ";"):
+                k += 1
+            params.append(text[i:k].strip())
+            i = k
+        i += 1  # past the delimiter
+    try:
+        return IGES_UNITS_M[int(params[13])]
+    except (IndexError, ValueError, KeyError):
+        return None
+
+
 def run_blender(blender, args, log_path):
     cmd = [blender, "-b", "--python-exit-code", "1", "--python", CONVERTER, "--"] + args
     with open(log_path, "w") as log:
@@ -196,8 +247,28 @@ def ingest_item(opts, source, item, path, manifest):
             print(f"    - {w}")
         return entry
 
+    cad_file = None
+    if os.path.splitext(model)[1].lower() in CAD_EXTS:
+        cad_file = model
+        try:
+            model = cad_to_glb(model, float(sidecar.get("cad_tolerance_m", 0.001)))
+        except Exception as exc:  # cascadio missing or the CAD file won't mesh
+            entry.update(status="failed", error=f"CAD meshing failed: {exc}")
+            print(f"! {key}: {entry['error']}")
+            return entry
+        entry["warnings"].append("meshed from CAD: expect dense triangles and plain colours, "
+                                 "no textures; check materials before close-ups")
+
     os.makedirs(out_dir, exist_ok=True)
     args = ["--src", model, "--out-dir", out_dir, "--name", item, "--search-dir", work]
+    if cad_file:
+        args += ["--up", "z"]
+        if CAD_EXTS[os.path.splitext(cad_file)[1].lower()] == "iges":
+            unit = iges_unit_m(cad_file)
+            if unit is None:
+                entry["warnings"].append("IGES unit not readable; set real_height_m in asset.json")
+            else:
+                args += ["--scale", str(unit)]
     if sidecar.get("real_height_m"):
         args += ["--real-height", str(sidecar["real_height_m"])]
     if entry.get("kind") == "material":
@@ -221,7 +292,7 @@ def ingest_item(opts, source, item, path, manifest):
     entry.update({k: report.get(k) for k in ("format", "dims_m", "triangles", "unit_factor",
                                             "unit_method", "meshes_without_uv")})
     entry["outputs"] = {k: rel_to_manifest(v, opts) for k, v in (report.get("outputs") or {}).items()}
-    entry["source_file"] = os.path.relpath(model, work)
+    entry["source_file"] = os.path.relpath(cad_file or model, work)
     entry["warnings"] += report.get("warnings", [])
     if code == 0 and report.get("ok"):
         entry["status"] = "ok"
@@ -262,7 +333,8 @@ def cmd_run(opts):
 
 def cmd_setup(opts):
     """Install the 3DS/MAX importer extensions (and optionally the SketchUp add-on)."""
-    steps = [[opts.blender, "--online-mode", "-c", "extension", "sync"]]
+    steps = [[sys.executable, "-m", "pip", "install", "--upgrade", "cascadio"],  # STEP/IGES
+             [opts.blender, "--online-mode", "-c", "extension", "sync"]]
     steps += [[opts.blender, "--online-mode", "-c", "extension", "install", "-s", "-e", ext]
               for ext in EXTENSIONS]
     if opts.skp_zip:

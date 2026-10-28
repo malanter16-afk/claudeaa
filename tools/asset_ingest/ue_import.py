@@ -44,7 +44,7 @@ def tag_assets(task, entry, tags):
                     zones=",".join(tags["zones"]), theme=tags["theme_fit"], tier=tags["tier"],
                     tags=",".join(tags["tags"]), function=tags["function"],
                     appearance=tags.get("appearance", ""), finishes=",".join(tags.get("finishes", [])),
-                    form=",".join(tags.get("form", [])),
+                    form=",".join(tags.get("form", [])), space_types=",".join(tags.get("space_types", [])),
                     colours=",".join(f"{c['name']} {c['hex']}" for c in tags.get("colour_palette", [])))
     for path in task.imported_object_paths:
         asset = unreal.EditorAssetLibrary.load_asset(path)

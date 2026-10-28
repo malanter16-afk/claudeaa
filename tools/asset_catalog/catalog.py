@@ -120,7 +120,8 @@ def match(wanted, local):
     return (best, best_score) if best_score >= 0.75 else (None, best_score)
 
 
-EASY_FORMATS = {".fbx", ".obj", ".glb", ".gltf", ".usd", ".usdc", ".usdz", ".3ds", ".blend", ".dae"}
+EASY_FORMATS = {".fbx", ".obj", ".glb", ".gltf", ".usd", ".usdc", ".usdz", ".3ds", ".blend", ".dae",
+                ".step", ".stp", ".iges", ".igs"}
 HARD_FORMATS = {".max", ".skp"}
 
 
@@ -320,6 +321,8 @@ def build_schema(tax):
         "scale_plausible": {"type": "boolean"},
         "issues": arr(),
     }
+    if tax.get("space_types"):  # optional: lets one library serve homes, offices, plants, sites...
+        props["space_types"] = arr(list(tax["space_types"]))
     return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False}
 
 
@@ -356,6 +359,9 @@ def build_system(tax):
         "issues. 'no_photo' if none is included.\n"
         "Images come in this order: hero 3/4 view, then front, side, close-up detail (when present), then the "
         "maker's photo (when present, labelled)."
+        + ("\n\nSpace types (space_types: every kind of space where this asset would look right, "
+           "beyond this project):\n" + "\n".join(f"- {k}: {v}" for k, v in tax["space_types"].items())
+           if tax.get("space_types") else "")
     )
 
 
@@ -550,7 +556,8 @@ def cmd_browse(opts):
         items.append({
             "id": e["id"], "name": tags["display_name"], "category": tags["category"],
             "sub": tags.get("subcategory", ""), "function": tags["function"], "desc": tags["description"],
-            "zones": tags["zones"], "theme": tags["theme_fit"], "tier": tags["tier"], "tags": tags["tags"],
+            "zones": tags["zones"], "theme": tags["theme_fit"], "tier": tags["tier"],
+            "tags": tags["tags"] + tags.get("space_types", []),
             "materials": tags["materials"], "issues": tags["issues"], "dims": e.get("dims_m"),
             "appearance": tags.get("appearance", ""), "form": tags.get("form", []),
             "finishes": tags.get("finishes", []), "palette": tags.get("colour_palette", []),
